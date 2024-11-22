@@ -1,0 +1,58 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) LaunchServer",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/server", // Caminho para o executável que você deseja depurar
+            "args": ["input.txt"],                        // Argumentos de linha de comando (deixe vazio se não tiver)
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",       // Diretório de trabalho do programa
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Habilitar a impressão de formato padrão para gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "buildServer",           // Task de compilação antes de iniciar a depuração
+            "miDebuggerPath": "/usr/bin/gdb",   // Caminho para o gdb (normalmente /usr/bin/gdb no Ubuntu)
+            "miDebuggerArgs": "",
+            "logging": {
+                "trace": true,                  // Define a depuração do próprio VSCode (opcional)
+                "traceResponse": true
+            }
+        },
+
+        {
+            "name": "(gdb) LaunchClient",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/client", // Caminho para o executável que você deseja depurar
+            "args": ["127.0.0.1", "51511"],                        // Argumentos de linha de comando (deixe vazio se não tiver)
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",       // Diretório de trabalho do programa
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Habilitar a impressão de formato padrão para gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "buildClient",           // Task de compilação antes de iniciar a depuração
+            "miDebuggerPath": "/usr/bin/gdb",   // Caminho para o gdb (normalmente /usr/bin/gdb no Ubuntu)
+            "miDebuggerArgs": "",
+            "logging": {
+                "trace": true,                  // Define a depuração do próprio VSCode (opcional)
+                "traceResponse": true
+            }
+        },
+    ]
+}

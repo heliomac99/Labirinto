@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "buildServer",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "server.c",
+        "-g",
+        "-o",
+        "server" // O comando de compila��o; ajuste os arquivos conforme necess�rio
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [ "$gcc" ],
+      "detail": "Compilando o servidor C para depura��o"
+    },
+    {
+      "label": "buildClient",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "client.c",
+        "-g",
+        "-o",
+        "client" // O comando de compila��o; ajuste os arquivos conforme necess�rio
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [ "$gcc" ],
+      "detail": "Compilando o servidor C para depura��o"
+    },
+  ]
+}
