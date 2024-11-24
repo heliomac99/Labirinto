@@ -6,9 +6,9 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/server", // Caminho para o executável que você deseja depurar
-            "args": ["input.txt"],                        // Argumentos de linha de comando (deixe vazio se não tiver)
+            "args": ["v4", "51511", "-i", "input/in.txt"], // Argumentos de linha de comando atualizados
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",       // Diretório de trabalho do programa
+            "cwd": "${workspaceFolder}", // Diretório de trabalho do programa
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -19,23 +19,22 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "buildServer",           // Task de compilação antes de iniciar a depuração
-            "miDebuggerPath": "/usr/bin/gdb",   // Caminho para o gdb (normalmente /usr/bin/gdb no Ubuntu)
+            "preLaunchTask": "buildServer", // Task de compilação antes de iniciar a depuração
+            "miDebuggerPath": "/usr/bin/gdb", // Caminho para o gdb (normalmente /usr/bin/gdb no Ubuntu)
             "miDebuggerArgs": "",
             "logging": {
-                "trace": true,                  // Define a depuração do próprio VSCode (opcional)
+                "trace": true, // Define a depuração do próprio VSCode (opcional)
                 "traceResponse": true
             }
         },
-
         {
             "name": "(gdb) LaunchClient",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/client", // Caminho para o executável que você deseja depurar
-            "args": ["127.0.0.1", "51511"],                        // Argumentos de linha de comando (deixe vazio se não tiver)
+            "args": ["127.0.0.1", "51511"], // Argumentos de linha de comando (deixe vazio se não tiver)
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",       // Diretório de trabalho do programa
+            "cwd": "${workspaceFolder}", // Diretório de trabalho do programa
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -46,13 +45,13 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "buildClient",           // Task de compilação antes de iniciar a depuração
-            "miDebuggerPath": "/usr/bin/gdb",   // Caminho para o gdb (normalmente /usr/bin/gdb no Ubuntu)
+            "preLaunchTask": "buildClient", // Task de compilação antes de iniciar a depuração
+            "miDebuggerPath": "/usr/bin/gdb", // Caminho para o gdb (normalmente /usr/bin/gdb no Ubuntu)
             "miDebuggerArgs": "",
             "logging": {
-                "trace": true,                  // Define a depuração do próprio VSCode (opcional)
+                "trace": true, // Define a depuração do próprio VSCode (opcional)
                 "traceResponse": true
             }
-        },
+        }
     ]
 }
