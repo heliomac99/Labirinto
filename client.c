@@ -13,7 +13,7 @@
 #define MAX_COLS 10
 
 // Definição dos comandos
-enum Commands { START = 0, MOVE = 1, MAP = 2, HINT = 3, UPDATE = 4, WIN = 5 , RESET = 6, EXIT = 7, ERROR = 8 };
+enum Commands { START = 0, MOVE = 1, MAP = 2, HINT = 3, UPDATE = 4, WIN = 5 , RESET = 6, EXIT = 7, ERROR = 8, GAMEOVER = 9 };
 enum Directions { UP = 1, RIGHT = 2, DOWN = 3, LEFT = 4};
 
 // Definição da estrutura Action
@@ -139,7 +139,10 @@ int main(int argc, char *argv[]) {
             } else if(command == RESET) {
                 handle_reset(&act);
             }
-        } else if (act.type == ERROR) {
+        }
+        else if(act.type == GAMEOVER){ // ao enviar comandos e o jogo esta acabado faça nada
+        }
+         else if (act.type == ERROR) {
             handle_error(&act);
         } else {
             printf("Resposta desconhecida do servidor.\n");

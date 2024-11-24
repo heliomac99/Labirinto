@@ -12,10 +12,10 @@
 #define MAX_ROWS 10
 #define MAX_COLS 10
 
-// Definição dos comandos
-enum Commands { START = 0, MOVE = 1, MAP = 2, HINT = 3, UPDATE = 4, WIN = 5 , RESET = 6, EXIT = 7, ERROR = 8 };
+// Definition of commands
+enum Commands { START = 0, MOVE = 1, MAP = 2, HINT = 3, UPDATE = 4, WIN = 5 , RESET = 6, EXIT = 7, ERROR = 8, GAMEOVER = 9 };
 
-// Definição da estrutura Action
+// Definition of the action structure
 #pragma pack(1)
 struct action {
     int32_t type;
@@ -25,26 +25,26 @@ struct action {
 };
 #pragma pack()
 
-// Definição da estrutura GameState
+// Definition of the GameState structure
 typedef struct {
-    uint32_t actual_rows; // Número real de linhas do mapa
-    uint32_t actual_cols; // Número real de colunas do mapa
+    uint32_t actual_rows; // Actual number of rows in the map
+    uint32_t actual_cols; // Actual number of columns in the map
     uint32_t player_i;
     uint32_t player_j;
     uint32_t inicio_i;
     uint32_t inicio_j;
     uint32_t fim_i;
     uint32_t fim_j;
-    uint32_t game_over; // Novo campo para indicar se o jogo acabou
-    uint32_t game_inicialized; // Novo campo para indicar se o jogo acabou
+    uint32_t game_over; // New field to indicate if the game is over
+    uint32_t game_inicialized; // New field to indicate if the game is initialized
     int32_t matrix[MAX_ROWS][MAX_COLS];
     int32_t matrix_decoberto[MAX_ROWS][MAX_COLS];
 } GameState;
 
-// Funções auxiliares
+// Function prototypes
 void read_matrix_from_file(const char *filename, GameState *gameState);
 void initialize_game(GameState *gameState, const char *filename);
-void handle_client(int client_fd, GameState *gameState, const char *filename);
+int handle_client(int client_fd, GameState *gameState, const char *filename);
 void process_action(int client_fd, struct action *act, GameState *gameState, const char *filename);
 void send_action(int client_fd, struct action *act);
 void serialize_action(struct action *act);
@@ -60,9 +60,20 @@ void reset_game(GameState *gameState);
 void set_matrix_descoberto_to_zeros(GameState *gameState);
 void mark_positions_around_player(GameState *gameState);
 
+// Handler function prototypes
+void handle_start(int client_fd, struct action *act, GameState *gameState, const char *filename);
+void handle_move(int client_fd, struct action *act, GameState *gameState);
+void handle_map(int client_fd, struct action *act, GameState *gameState);
+void handle_reset(int client_fd, struct action *act, GameState *gameState, const char *filename);
+void handle_exit(int client_fd, struct action *act);
+void handle_default(int client_fd, struct action *act);
+void handle_game_not_inicialized(int client_fd, struct action *act);
+void handle_game_over(int client_fd, struct action *act, GameState *gameState, const char *filename);
+void handle_commands_game_over(int client_fd, struct action *act);
+
 int main(int argc, char *argv[]) {
     if (argc != 5) {
-        fprintf(stderr, "Uso: %s <v4|v6> <porta> -i <arquivo de entrada da matriz>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <v4|v6> <port> -i <input matrix file>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -72,7 +83,7 @@ int main(int argc, char *argv[]) {
     char *input_file = argv[4];
 
     if (strcmp(input_flag, "-i") != 0) {
-        fprintf(stderr, "Uso: %s <v4|v6> <porta> -i <arquivo de entrada da matriz>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <v4|v6> <port> -i <input matrix file>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -83,19 +94,19 @@ int main(int argc, char *argv[]) {
 
     memset(&hints, 0, sizeof hints);
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE; // Use o endereço IP do sistema
+    hints.ai_flags = AI_PASSIVE; // Use the system's IP address
 
     if (strcmp(ip_version, "v4") == 0) {
         hints.ai_family = AF_INET;
     } else if (strcmp(ip_version, "v6") == 0) {
         hints.ai_family = AF_INET6;
     } else {
-        fprintf(stderr, "Versão IP inválida: %s. Use v4 ou v6.\n", ip_version);
+        fprintf(stderr, "Invalid IP version: %s. Use v4 or v6.\n", ip_version);
         exit(EXIT_FAILURE);
     }
 
     if ((status = getaddrinfo(NULL, port, &hints, &res)) != 0) {
-        fprintf(stderr, "Erro em getaddrinfo: %s\n", gai_strerror(status));
+        fprintf(stderr, "Error in getaddrinfo: %s\n", gai_strerror(status));
         exit(EXIT_FAILURE);
     }
 
@@ -117,58 +128,59 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        break; // Sucesso
+        break; // Success
     }
 
     if (p == NULL) {
-        fprintf(stderr, "server: falha ao bindar\n");
+        fprintf(stderr, "server: failed to bind\n");
         exit(EXIT_FAILURE);
     }
 
     freeaddrinfo(res);
 
     if (listen(server_fd, 1) == -1) {
-        perror("Erro no listen");
+        perror("Error in listen");
         close(server_fd);
         exit(EXIT_FAILURE);
     }
 
-    //printf("Servidor esperando por conexões na porta %s...\n", port);
+    while (1) {
+        struct sockaddr_storage client_addr;
+        socklen_t client_addr_len = sizeof(client_addr);
 
-    struct sockaddr_storage client_addr;
-    socklen_t client_addr_len = sizeof(client_addr);
+        // Accept connection
+        int client_fd;
+        if ((client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len)) == -1) {
+            perror("Error in accept");
+            close(server_fd);
+            exit(EXIT_FAILURE);
+        }
 
-    // Aceitar conexão
-    int client_fd;
-    if ((client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len)) == -1) {
-        perror("Erro no accept");
-        close(server_fd);
-        exit(EXIT_FAILURE);
+        printf("client connected.\n");
+
+        // Initialize the game
+        GameState gameState;
+        init_game_state(&gameState);
+        // Handle the client
+
+        int bytes = handle_client(client_fd, &gameState, input_file);
+        if (bytes == -1 || bytes == 0) {
+            close(client_fd);
+        }
     }
 
-    printf("client connected.\n");
-
-    // Inicializar o jogo
-    GameState gameState;
-    init_game_state(&gameState);
-    // Lidar com o cliente
-    handle_client(client_fd, &gameState, input_file);
-
-    // Fechar sockets
-    close(client_fd);
     close(server_fd);
-
     return 0;
 }
 
 void read_matrix_from_file(const char *filename, GameState *gameState) {
     FILE *file = fopen(filename, "r");
     if (!file) {
-        perror("Erro ao abrir o arquivo");
+        perror("Error opening the file");
         exit(EXIT_FAILURE);
     }
 
-    // Inicializar a matriz com -1
+    // Initialize the matrix with -1
     for (int i = 0; i < MAX_ROWS; i++) {
         for (int j = 0; j < MAX_COLS; j++) {
             gameState->matrix[i][j] = -1;
@@ -185,7 +197,7 @@ void read_matrix_from_file(const char *filename, GameState *gameState) {
         while (token && col < MAX_COLS) {
             int value = atoi(token);
             if (value == 2) {
-                value = 5; // Representar o jogador com 5
+                value = 5; // Represent the player with 5
                 gameState->player_i = row;
                 gameState->player_j = col;
                 gameState->inicio_i = row;
@@ -202,7 +214,7 @@ void read_matrix_from_file(const char *filename, GameState *gameState) {
         if (cols_in_first_row == -1) {
             cols_in_first_row = col;
         } else if (col != cols_in_first_row) {
-            fprintf(stderr, "Erro: Número inconsistente de colunas na linha %d.\n", row + 1);
+            fprintf(stderr, "Error: Inconsistent number of columns in line %d.\n", row + 1);
             fclose(file);
             exit(EXIT_FAILURE);
         }
@@ -210,8 +222,8 @@ void read_matrix_from_file(const char *filename, GameState *gameState) {
         row++;
     }
 
-    gameState->actual_rows = row;              // Número real de linhas do mapa
-    gameState->actual_cols = cols_in_first_row; // Número real de colunas do mapa
+    gameState->actual_rows = row;              // Actual number of rows in the map
+    gameState->actual_cols = cols_in_first_row; // Actual number of columns in the map
 
     fclose(file);
 }
@@ -221,8 +233,8 @@ void initialize_game(GameState *gameState, const char *filename) {
     read_matrix_from_file(filename, gameState);
     set_matrix_descoberto_to_zeros(gameState);
     mark_positions_around_player(gameState);
-    gameState->game_over = 0; // Inicializar o jogo como não terminado
-    gameState->game_inicialized = 1; // Setar o jogo como iniciado
+    gameState->game_over = 0; // Initialize the game as not over
+    gameState->game_inicialized = 1; // Set the game as initialized
     printf("starting new game\n");
 }
 
@@ -239,16 +251,16 @@ void mark_positions_around_player(GameState *gameState) {
         for (uint32_t j = 0; j < gameState->actual_cols; j++) {
             int delta_i = i - gameState->player_i;
             int delta_j = j - gameState->player_j;
-            int chebyshev_distance = (delta_i > delta_j) ? delta_i : delta_j; // Distância de Chebyshev
+            int chebyshev_distance = (delta_i > delta_j) ? delta_i : delta_j; // Chebyshev distance
 
             if (chebyshev_distance <= 1) {
-                gameState->matrix_decoberto[i][j] = 1; // Marca a posição como 1
+                gameState->matrix_decoberto[i][j] = 1; // Mark the position as 1
             }
         }
     }
 }
 
-void handle_client(int client_fd, GameState *gameState, const char *filename) {
+int handle_client(int client_fd, GameState *gameState, const char *filename) {
     struct action act;
     int num_bytes;
 
@@ -257,119 +269,46 @@ void handle_client(int client_fd, GameState *gameState, const char *filename) {
         process_action(client_fd, &act, gameState, filename);
     }
 
-    if (num_bytes == -1) {
-        perror("Erro no recv");
+    if (num_bytes == 0) {
+        return 0;
     }
-}
 
-void reset_game(GameState *gameState) {
+    if (num_bytes == -1) {
+        return -1;
+    }
 
-    gameState->matrix[gameState->player_i][gameState->player_j] = 1; // Marcar como caminho livre ou como estava antes
-    gameState->matrix[gameState->fim_i][gameState->fim_j] = 3; // Marcar como saída
-
-    // Restaurar a posição inicial do jogador
-    gameState->player_i = gameState->inicio_i;
-    gameState->player_j = gameState->inicio_j;
-
-    // Atualizar a matriz com a nova posição do jogador
-    gameState->matrix[gameState->player_i][gameState->player_j] = 5; // Representar o jogador
-
-    // Redefinir o estado do jogo se necessário
-    gameState->game_over = 0;
+    return INT32_MIN;
 }
 
 void process_action(int client_fd, struct action *act, GameState *gameState, const char *filename) {
-    
-    if (act->type != START && gameState->game_inicialized == 0) {
-        build_error(act, "error: start the game first");
-        send_action(client_fd, act);
+    if(gameState->game_over){
+        handle_game_over(client_fd, act, gameState, filename);
+    } else if (act->type != START && gameState->game_inicialized == 0) {
+        handle_game_not_inicialized(client_fd, act);
     } else {
         switch (act->type) {
             case START:
-                if(!gameState->game_over) {
-                    initialize_game(gameState, filename);
-                    memset(act->moves, 0, sizeof(act->moves));
-                    memset(act->board, 0, sizeof(act->board));
-                    fill_possible_moves(gameState, act);
-                    act->type = UPDATE;
-                    send_action(client_fd, act);
-                }
+                handle_start(client_fd, act, gameState, filename);
                 break;
 
-            case MOVE: {
-                if(!gameState->game_over){
-                    // Pega direção inserida pelo cliente no moves e executa o movimento
-                    int direction = act->moves[0];
-                    if(move_player(gameState, direction) == 1) {
-                        if (gameState->game_over) {
-                            // Enviar mensagem de vitória com tipo WIN
-                            act->type = WIN;
-                            memset(act->moves, 0, sizeof(act->moves));
-                            memset(act->board, 0, sizeof(act->board));
-                            copy_board_to_action(gameState, act);
-                            act->board[gameState->fim_i][gameState->fim_j] = 3;
-                            send_action(client_fd, act);
-                        } else {
-                            // Enviar atualização normal com tipo UPDATE
-                            act->type = UPDATE;
-                            memset(act->moves, 0, sizeof(act->moves));
-                            memset(act->board, 0, sizeof(act->board));
-                            fill_possible_moves(gameState, act);
-                            send_action(client_fd, act);
-                        }
-                    }
-                    else{
-                        build_error(act, "error: you cannot go this way");
-                        send_action(client_fd, act);
-                    }
-                }
+            case MOVE:
+                handle_move(client_fd, act, gameState);
                 break;
-            }
 
             case MAP:
-                if(!gameState->game_over){
-                    // Preparar a ação com o mapa parcial
-                    copy_board_to_action(gameState, act);
-
-                    // Marcar posições fora do alcance com 4
-                    fill_unreachable_positions(gameState, act);
-
-                    // Enviar o mapa parcial com tipo UPDATE
-                    act->type = UPDATE;
-                    memset(act->moves, 0, sizeof(act->moves));
-                    send_action(client_fd, act);
-                } 
-        
+                handle_map(client_fd, act, gameState);
                 break;
 
             case RESET:
-                // Chamar a função para reiniciar o jogo
-                initialize_game(gameState, filename);
-
-                // Enviar confirmação com tipo UPDATE
-                act->type = UPDATE;
-                memset(act->moves, 0, sizeof(act->moves));
-                memset(act->board, 0, sizeof(act->board));
-                fill_possible_moves(gameState, act);
-                send_action(client_fd, act);
+                handle_reset(client_fd, act, gameState, filename);
                 break;
 
             case EXIT:
-                printf("client disconnected\n");
-
-                act->type = UPDATE;
-                memset(act->moves, 0, sizeof(act->moves));
-                memset(act->board, 0, sizeof(act->board));
-                send_action(client_fd, act);
-
-                close(client_fd);
-                exit(0); 
+                handle_exit(client_fd, act);
                 break;
 
             default:
-                // Enviar mensagem de erro com tipo ERROR
-                build_error(act, "error: command not found");
-                send_action(client_fd, act);
+                handle_default(client_fd, act);
                 break;
         }
     }
@@ -431,11 +370,11 @@ int move_player(GameState *gameState, int direction) {
 
         int cell_value = gameState->matrix[new_i][new_j];
 
-        // Atualizar a posição anterior
+        // Update the previous position
         if (gameState->player_i == gameState->inicio_i && gameState->player_j == gameState->inicio_j)
-            gameState->matrix[gameState->player_i][gameState->player_j] = 2; // Posição inicial
+            gameState->matrix[gameState->player_i][gameState->player_j] = 2; // Starting position
         else
-            gameState->matrix[gameState->player_i][gameState->player_j] = 1; // Caminho livre
+            gameState->matrix[gameState->player_i][gameState->player_j] = 1; // Free path
 
         gameState->player_i = new_i;
         gameState->player_j = new_j;
@@ -443,17 +382,16 @@ int move_player(GameState *gameState, int direction) {
         mark_positions_around_player(gameState);
 
         if (cell_value == 3) {
-            // O jogador alcançou a saída
+            // The player reached the exit
             gameState->game_over = 1;
-            gameState->matrix[new_i][new_j] = 5; // Atualizar para representar o jogador
+            gameState->matrix[new_i][new_j] = 5; // Update to represent the player
         } else {
-            gameState->matrix[new_i][new_j] = 5; // Atualizar para representar o jogador
+            gameState->matrix[new_i][new_j] = 5; // Update to represent the player
         }
-        
 
-        return 1; // Significa que o jogador caminhou
+        return 1; // Indicates that the player moved
     } else {
-        return 0; // Significa que o jogador não caminhou
+        return 0; // Indicates that the player did not move
     }
 }
 
@@ -468,7 +406,7 @@ void calculate_possible_moves(GameState *gameState, int possible_moves[4]) {
 }
 
 void copy_board_to_action(GameState *gameState, struct action *act) {
-    // Copiar o estado atual da matriz para a ação
+    // Copy the current state of the matrix to the action
     for (int i = 0; i < MAX_ROWS; i++) {
         for (int j = 0; j < MAX_COLS; j++) {
             act->board[i][j] = gameState->matrix[i][j];
@@ -480,17 +418,17 @@ void fill_unreachable_positions(GameState *gameState, struct action *act) {
     int player_i = gameState->player_i;
     int player_j = gameState->player_j;
 
-    // Definir o raio de visibilidade (uma casa de alcance, incluindo diagonais)
+    // Define the visibility radius (one square range, including diagonals)
     int visibility_radius = 1;
 
     for (uint32_t i = 0; i < gameState->actual_rows; i++) {
         for (uint32_t j = 0; j < gameState->actual_cols; j++) {
             int delta_i = abs((int)i - player_i);
             int delta_j = abs((int)j - player_j);
-            int distance = delta_i > delta_j ? delta_i : delta_j; // Distância de Chebyshev
+            int distance = delta_i > delta_j ? delta_i : delta_j; // Chebyshev distance
 
             if (distance > visibility_radius && gameState->matrix[i][j] != -1 && gameState->matrix_decoberto[i][j] == 0) {
-                act->board[i][j] = 4; // Marcar como não visível
+                act->board[i][j] = 4; // Mark as not visible
             }
         }
     }
@@ -508,10 +446,10 @@ void init_game_state(GameState *game_state) {
 }
 
 void fill_possible_moves(GameState *gameState, struct action *act) {
-    // Calcular movimentos possíveis
+    // Calculate possible moves
     int possible_moves[4];
     calculate_possible_moves(gameState, possible_moves);
-    // Preencher o campo moves da ação
+    // Fill the moves field of the action
     memset(act->moves, 0, sizeof(act->moves));
     int idx = 0;
     for (int i = 0; i < 4; i++) {
@@ -521,9 +459,133 @@ void fill_possible_moves(GameState *gameState, struct action *act) {
     }
 }
 
-void build_error(struct action *act, const char* msg){
+void build_error(struct action *act, const char* msg) {
     act->type = ERROR;
     strcpy(act->error_message, msg);
     memset(act->moves, 0, sizeof(act->moves));
     memset(act->board, 0, sizeof(act->board));
+}
+
+void handle_start(int client_fd, struct action *act, GameState *gameState, const char *filename) {
+    if (!gameState->game_over) {
+        initialize_game(gameState, filename);
+        memset(act->moves, 0, sizeof(act->moves));
+        memset(act->board, 0, sizeof(act->board));
+        fill_possible_moves(gameState, act);
+        act->type = UPDATE;
+        send_action(client_fd, act);
+    }
+}
+
+void handle_move(int client_fd, struct action *act, GameState *gameState) {
+    if (!gameState->game_over) {
+        // Get the direction from the client's action and execute the movement
+        int direction = act->moves[0];
+        if (move_player(gameState, direction) == 1) {
+            if (gameState->game_over) {
+                // Send victory message with type WIN
+                act->type = WIN;
+                memset(act->moves, 0, sizeof(act->moves));
+                memset(act->board, 0, sizeof(act->board));
+                copy_board_to_action(gameState, act);
+                act->board[gameState->fim_i][gameState->fim_j] = 3;
+                send_action(client_fd, act);
+            } else {
+                // Send normal update with type UPDATE
+                act->type = UPDATE;
+                memset(act->moves, 0, sizeof(act->moves));
+                memset(act->board, 0, sizeof(act->board));
+                fill_possible_moves(gameState, act);
+                send_action(client_fd, act);
+            }
+        } else {
+            build_error(act, "error: you cannot go this way");
+            send_action(client_fd, act);
+        }
+    }
+}
+
+void handle_map(int client_fd, struct action *act, GameState *gameState) {
+    if (!gameState->game_over) {
+        // Prepare the action with the partial map
+        copy_board_to_action(gameState, act);
+
+        // Mark positions out of reach with 4
+        fill_unreachable_positions(gameState, act);
+
+        // Send the partial map with type UPDATE
+        act->type = UPDATE;
+        memset(act->moves, 0, sizeof(act->moves));
+        send_action(client_fd, act);
+    }
+}
+
+void handle_reset(int client_fd, struct action *act, GameState *gameState, const char *filename) {
+    // Call the function to restart the game
+    initialize_game(gameState, filename);
+
+    // Send confirmation with type UPDATE
+    act->type = UPDATE;
+    memset(act->moves, 0, sizeof(act->moves));
+    memset(act->board, 0, sizeof(act->board));
+    fill_possible_moves(gameState, act);
+    send_action(client_fd, act);
+}
+
+void handle_exit(int client_fd, struct action *act) {
+    printf("client disconnected\n");
+
+    act->type = UPDATE;
+    memset(act->moves, 0, sizeof(act->moves));
+    memset(act->board, 0, sizeof(act->board));
+    send_action(client_fd, act);
+
+    close(client_fd);
+}
+
+void handle_default(int client_fd, struct action *act) {
+    // Send error message with type ERROR
+    build_error(act, "error: command not found");
+    send_action(client_fd, act);
+}
+
+void handle_game_not_inicialized(int client_fd, struct action *act) {
+    // Send error message with type ERROR
+    build_error(act, "error: start the game first");
+    send_action(client_fd, act);
+}
+
+void handle_commands_game_over(int client_fd, struct action *act) {
+    act->type = GAMEOVER;
+    memset(act->moves, 0, sizeof(act->moves));
+    memset(act->board, 0, sizeof(act->board));
+    send_action(client_fd, act);
+}
+
+void handle_game_over(int client_fd, struct action *act, GameState *gameState, const char *filename) {
+    switch (act->type) {
+            case START:
+                handle_commands_game_over(client_fd, act);
+                break;
+
+            case MOVE:
+                handle_commands_game_over(client_fd, act);
+                break;
+
+            case MAP:
+                handle_commands_game_over(client_fd, act);
+                break;
+
+            case RESET:
+                handle_reset(client_fd, act, gameState, filename);
+                break;
+
+            case EXIT:
+                handle_exit(client_fd, act);
+                break;
+
+            default:
+                handle_default(client_fd, act);
+                break;
+        }
 }
